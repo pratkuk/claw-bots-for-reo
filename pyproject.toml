@@ -1,0 +1,59 @@
+[project]
+name = "claw-bots-for-reo"
+version = "0.1.0"
+description = "OpenClaw agent template that surfaces Web3 developers showing buying intent, with drafted outreach, posted to Slack."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Pratyush Kukreja" }]
+requires-python = ">=3.11"
+keywords = ["reo", "pinata", "openclaw", "web3", "mcp", "devtools", "gtm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/pratkuk/claw-bots-for-reo"
+Issues = "https://github.com/pratkuk/claw-bots-for-reo/issues"
+
+# =============================================================
+# Ruff — single tool for lint + format
+# (§1.1 of reo_pinata_agent_context.md mandates idiomatic Python
+#  with type hints; ruff enforces the subset we care about.)
+# =============================================================
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["workspace/projects/reo-mcp", "scripts"]
+
+[tool.ruff.lint]
+# Curated rule set — cover the real bugs (bugbear, pyflakes), the
+# style nits (isort, pyupgrade), and the security smells (S), while
+# keeping the config small enough to actually read.
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "B",   # bugbear
+    "I",   # isort
+    "UP",  # pyupgrade
+    "S",   # bandit-style security
+    "SIM", # simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "S101", # assert used — fine in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "B"]          # tests are allowed loose
+"scripts/smoke_test.py" = ["S"]      # smoke script uses urllib directly; fine
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
