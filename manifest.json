@@ -1,16 +1,4 @@
 {
-  "_docs": {
-    "_comment": "REMOVE THIS BLOCK BEFORE SUBMITTING TO PINATA. It's here to keep the rationale for each field next to the field itself while iterating.",
-    "agent": "Identity that renders in Slack and the marketplace card.",
-    "template": "Marketplace metadata (slug, category, tags, partner info).",
-    "model": "Which model to run on. Omit primary to fall back to Pinata's default.",
-    "secrets": "Declared here, values set at deploy time. Never commit values.",
-    "tasks": "Cron tasks — names MUST match HEARTBEAT.md task names.",
-    "channels": "Outbound channels. slack.dmPolicy=pairing restricts to paired user.",
-    "scripts": "build runs after git push; start runs on agent boot and must start our MCP server.",
-    "routes": "Port forwards. MCP server binds 0.0.0.0:8787 and is reached via /mcp."
-  },
-
   "agent": {
     "name": "Reo Intel",
     "emoji": ":radar:",
