@@ -1,0 +1,96 @@
+{
+  "_docs": {
+    "_comment": "REMOVE THIS BLOCK BEFORE SUBMITTING TO PINATA. It's here to keep the rationale for each field next to the field itself while iterating.",
+    "agent": "Identity that renders in Slack and the marketplace card.",
+    "template": "Marketplace metadata (slug, category, tags, partner info).",
+    "model": "Which model to run on. Omit primary to fall back to Pinata's default.",
+    "secrets": "Declared here, values set at deploy time. Never commit values.",
+    "tasks": "Cron tasks — names MUST match HEARTBEAT.md task names.",
+    "channels": "Outbound channels. slack.dmPolicy=pairing restricts to paired user.",
+    "scripts": "build runs after git push; start runs on agent boot and must start our MCP server.",
+    "routes": "Port forwards. MCP server binds 0.0.0.0:8787 and is reached via /mcp."
+  },
+
+  "agent": {
+    "name": "Reo Intel",
+    "emoji": ":radar:",
+    "vibe": "Quiet, precise, signal-first. The sharpest GTM analyst on your team.",
+    "description": "A scheduled agent that posts a daily prioritised digest of Web3-native developer orgs showing buying intent for your tool — with the top contact surfaced and a personalised first-touch message drafted per account. Powered by Reo.Dev's intent signals (doc visits, GitHub actions, copy-command telemetry). Deploy once, pair your Slack, pick a Reo segment, and Reo Intel runs every weekday morning. Built for Web3 devtool GTM teams (infra, SDK, indexer, wallet, chain). Outreach drafts cite specific signals — never generic. See the repo README for full setup."
+  },
+
+  "template": {
+    "slug": "claw-bots-for-reo",
+    "category": "gtm",
+    "tags": [
+      "web3",
+      "sales",
+      "developer-intent",
+      "reo",
+      "slack",
+      "outreach",
+      "scheduled"
+    ],
+    "partnerName": "Reo.Dev",
+    "partnerUrl": "https://reo.dev",
+    "partnerLogoUrl": "https://reo.dev/favicon.ico"
+  },
+
+  "model": {
+    "primary": "anthropic/claude-sonnet-4-6"
+  },
+
+  "secrets": [
+    {
+      "name": "REO_API_KEY",
+      "description": "Your Reo.Dev API key. Request via contact@reo.dev. Auth uses the x-api-key header.",
+      "required": true
+    },
+    {
+      "name": "REO_API_BASE_URL",
+      "description": "Reo REST base URL. Default https://integration.reo.dev — override only if Reo directs you to.",
+      "required": false
+    },
+    {
+      "name": "REO_MCP_INTERNAL_TOKEN",
+      "description": "Shared secret between the agent and the local MCP server. Generate a fresh 32+ char random string at deploy time.",
+      "required": true
+    }
+  ],
+
+  "skills": [],
+
+  "tasks": [
+    {
+      "name": "daily-intent-digest",
+      "prompt": "Run the daily intent digest per HEARTBEAT.md. Read USER.md for default_segment_id, digest_limit, web3_only, and slack_channel. Call get_top_intent_accounts, drill the top 5 with get_account_activity_detail + get_active_developers + get_key_contacts, synthesise per SOUL.md voice rules and AGENTS.md format rules, and post once to the paired Slack channel. If preconditions fail (no segment set, MCP server unreachable, Reo auth error), follow AGENTS.md §8 — post once, then stay quiet until fixed.",
+      "schedule": "0 14 * * *",
+      "enabled": true
+    }
+  ],
+
+  "channels": {
+    "slack": {
+      "enabled": true,
+      "dmPolicy": "pairing"
+    },
+    "telegram": {
+      "enabled": false
+    },
+    "discord": {
+      "enabled": false
+    }
+  },
+
+  "scripts": {
+    "build": "cd ./workspace/projects/reo_mcp && pip install -r requirements.txt",
+    "start": "cd ./workspace/projects/reo_mcp && python server.py --host 0.0.0.0 --port 8787 --transport http --path /mcp"
+  },
+
+  "routes": [
+    {
+      "port": 8787,
+      "path": "/mcp",
+      "protected": true
+    }
+  ]
+}
