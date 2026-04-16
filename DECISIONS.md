@@ -36,7 +36,7 @@
 - **Approach:** curated domain allow-list (heuristic — no native Web3 field in Reo's industry enum)
 - **Seed source:** user's existing Reo segment `da8416c8-7dc1-4ab9-9fca-d921620dbce3`, 297 unique domains
 - **Extensibility:** `/web3-domains +foo.xyz` slash command at runtime
-- **File:** `workspace/projects/reo-mcp/web3_domains.py` (frozenset)
+- **File:** `workspace/projects/reo_mcp/web3_domains.py` (frozenset; Python package names can't have hyphens)
 
 ### Bootstrap flow
 - User pastes Reo segment URL (or bare UUID) on first run
@@ -76,6 +76,49 @@
 
 ---
 
+## 2026-04-16 — Post-live-integration findings (Step 3)
+
+Live end-to-end run against segment `da8416c8-...` produced the following
+observations. Kept in this log because they influence digest UX decisions
+that haven't been made yet.
+
+### Pagination — two contracts on the same API
+- `/segments` returns every row on page 1, `total_pages: null`, subsequent
+  `?page=N` values are ignored (return same 571 rows).
+- `/segment/{id}/accounts` honours `?page=N` and reports integer `total_pages`.
+- `_paginate_all` now walks using `total_pages`; falls back to "single page"
+  when null. Regression locked in by
+  `test_paginate_all_stops_when_total_pages_null`.
+
+### Data quality in the Crypto-keyword segment (n=297)
+- 362 ACCOUNT-type segments visible to this API key (cleaner than prior
+  18 100 figure which was pagination duplication).
+- Top account `Crusoe` (HIGH, 2 devs) had **0 activity events in the last
+  30 days** — intent tagged HIGH from older signal. Implication: digest
+  should widen the activity lookback window or caveat the recency of the
+  HIGH score.
+- Only 2 developers total at `crusoeenergy.com`; insufficient for a
+  function+seniority filter to produce meaningful intersections.
+
+### Leadership filter over-captures "Head of Sales"
+- `FUNCTION_KEYWORDS["leadership"]` includes `"head of"`, which matched
+  `Head of Sales Development` at the top-ranked account. For a GTM
+  workflow targeting dev buyers, this is probably wrong.
+- **Not fixing in v1.0** — the agent prompt in `AGENTS.md` will be told
+  to prefer `function=engineering` + `seniority=vp` over the bare
+  `function=leadership`. Revisit in v1.1 if data shows the keyword set
+  still over-captures.
+
+### Sanitisation strategy for fixtures
+- All `account_id` / `developer_id` hashed to 8-char prefix (`acc_`/`dev_`).
+- Emails: `<redacted>@<domain>` — domain kept as Web3 signal.
+- LinkedIn/GitHub URLs: replaced with hashed slug, platform preserved.
+- Internal `reo_developer_link` dropped entirely.
+- Script: `scripts/live_integration.py` (reusable, deterministic).
+
+---
+
 ## Changelog of this file
 
+- **2026-04-16 v2** — post-live-run observations (pagination fix, data quality, filter calibration)
 - **2026-04-16 v1** — initial write after pre-build alignment complete
