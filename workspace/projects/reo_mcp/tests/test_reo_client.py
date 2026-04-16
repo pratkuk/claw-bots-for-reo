@@ -181,23 +181,71 @@ def _full_page(seed: int) -> list[dict[str, Any]]:
 
 
 @respx.mock
-def test_paginate_all_stops_on_partial_page(client: ReoClient) -> None:
-    # page=1 → full (100 rows); page=2 → partial (42 rows) → stop.
-    respx.get(f"{BASE}/segments", params={"page": "1"}).mock(
-        return_value=httpx.Response(200, json={"data": _full_page(1)})
+def test_paginate_all_walks_declared_total_pages(client: ReoClient) -> None:
+    # Proper pagination: server reports total_pages=3 and honours ?page=N.
+    respx.get(f"{BASE}/segment/abc/accounts", params={"page": "1"}).mock(
+        return_value=httpx.Response(
+            200, json={"data": _full_page(1), "total_pages": 3}
+        )
     )
-    respx.get(f"{BASE}/segments", params={"page": "2"}).mock(
-        return_value=httpx.Response(200, json={"data": [{"id": f"row-2-{i}"} for i in range(42)]})
+    respx.get(f"{BASE}/segment/abc/accounts", params={"page": "2"}).mock(
+        return_value=httpx.Response(
+            200, json={"data": _full_page(2), "total_pages": 3}
+        )
     )
-    rows = client.list_all_segments()
-    assert len(rows) == 142
+    respx.get(f"{BASE}/segment/abc/accounts", params={"page": "3"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": [{"id": f"row-3-{i}"} for i in range(42)],
+                "total_pages": 3,
+            },
+        )
+    )
+    rows = client.list_all_accounts_in_segment("abc")
+    assert len(rows) == 242
 
 
 @respx.mock
-def test_paginate_all_single_page(client: ReoClient) -> None:
-    # First page already partial → stop immediately.
-    respx.get(f"{BASE}/segments", params={"page": "1"}).mock(
-        return_value=httpx.Response(200, json={"data": [{"id": "s1"}]})
+def test_paginate_all_stops_when_total_pages_null(client: ReoClient) -> None:
+    # /segments returns every row on page 1 with total_pages=null and
+    # duplicates results on subsequent pages. Walker must NOT re-request.
+    route = respx.get(f"{BASE}/segments", params={"page": "1"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": [{"id": f"s{i}"} for i in range(571)],
+                "total_pages": None,
+            },
+        )
     )
     rows = client.list_all_segments()
-    assert rows == [{"id": "s1"}]
+    assert len(rows) == 571
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_paginate_all_single_page_when_total_pages_one(client: ReoClient) -> None:
+    respx.get(f"{BASE}/segment/abc/accounts", params={"page": "1"}).mock(
+        return_value=httpx.Response(200, json={"data": [{"id": "s1"}], "total_pages": 1})
+    )
+    assert client.list_all_accounts_in_segment("abc") == [{"id": "s1"}]
+
+
+@respx.mock
+def test_paginate_all_respects_hard_cap(client: ReoClient) -> None:
+    # If server reports an absurd total_pages, walker must cap at PAGE_HARD_CAP.
+    absurd = ReoClient.PAGE_HARD_CAP + 20
+    for page in range(1, ReoClient.PAGE_HARD_CAP + 1):
+        respx.get(f"{BASE}/segment/abc/accounts", params={"page": str(page)}).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [{"id": f"row-{page}-{i}"} for i in range(10)],
+                    "total_pages": absurd,
+                },
+            )
+        )
+    rows = client.list_all_accounts_in_segment("abc")
+    # 50 pages x 10 rows per page = 500. No requests beyond hard cap.
+    assert len(rows) == ReoClient.PAGE_HARD_CAP * 10

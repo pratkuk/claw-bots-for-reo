@@ -173,6 +173,15 @@ class ReoClient:
 
     def _get_data(self, path: str) -> list[dict[str, Any]]:
         """GET, raise on auth/404, return the `data` array."""
+        data, _ = self._get_page(path)
+        return data
+
+    def _get_page(self, path: str) -> tuple[list[dict[str, Any]], int | None]:
+        """GET, raise on auth/404, return (data, total_pages).
+
+        `total_pages` is the server-reported page count, or None when the
+        endpoint doesn't populate it (e.g. `/segments` returns null).
+        """
         response = self._get(path)
 
         if response.status_code in (401, 403):
@@ -194,27 +203,43 @@ class ReoClient:
         data = body.get("data")
         if not isinstance(data, list):
             raise ReoClientError(f"response from {path} missing 'data' list")
-        return data
+
+        total_pages = body.get("total_pages")
+        if not isinstance(total_pages, int) or total_pages < 1:
+            total_pages = None
+        return data, total_pages
 
     def _paginate_all(self, base_path: str) -> list[dict[str, Any]]:
-        """Walk pages until one returns < a full page of rows.
+        """Walk pages honouring `total_pages` from the first response.
 
-        Reo uses `?page=N`; responses include `total_pages`. We use the
-        response-size heuristic as a safety net since pagination details
-        aren't guaranteed stable across endpoints.
+        Contract observed on Reo's API (2026-04):
+        - `/segments` — returns every row on page 1, `total_pages` is null,
+          and subsequent pages duplicate page 1. Treat null as "single page".
+        - `/segment/{id}/accounts` — proper pagination, `total_pages` is an
+          integer, `?page=N` is honoured.
+
+        If `total_pages` is null we return page 1 only. Otherwise we walk
+        2..min(total_pages, PAGE_HARD_CAP). This prevents the unbounded
+        duplication we'd otherwise get from `/segments` pretending to
+        paginate.
         """
         joiner = "&" if "?" in base_path else "?"
-        all_rows: list[dict[str, Any]] = []
-        for page in range(1, self.PAGE_HARD_CAP + 1):
+        first_data, total_pages = self._get_page(f"{base_path}{joiner}page=1")
+        if total_pages is None or total_pages <= 1:
+            return first_data
+
+        all_rows: list[dict[str, Any]] = list(first_data)
+        last_page = min(total_pages, self.PAGE_HARD_CAP)
+        for page in range(2, last_page + 1):
             rows = self._get_data(f"{base_path}{joiner}page={page}")
             all_rows.extend(rows)
-            if len(rows) < 100:  # last partial page
-                return all_rows
-        logger.warning(
-            "paginate_all hit hard cap %d on %s — returning partial result",
-            self.PAGE_HARD_CAP,
-            base_path,
-        )
+        if total_pages > self.PAGE_HARD_CAP:
+            logger.warning(
+                "paginate_all hit hard cap %d on %s (server reports %d pages) — partial",
+                self.PAGE_HARD_CAP,
+                base_path,
+                total_pages,
+            )
         return all_rows
 
     @staticmethod
