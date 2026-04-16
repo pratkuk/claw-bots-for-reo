@@ -1,4 +1,6 @@
 {
+  "version": 1,
+
   "agent": {
     "name": "Reo Intel",
     "emoji": ":radar:",
