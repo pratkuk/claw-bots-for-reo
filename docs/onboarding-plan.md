@@ -1,6 +1,9 @@
 # Onboarding & Multi-Tenant Config — Build Plan (v1)
 
-Status: approved 2026-04-20 · not yet implemented
+Status: steps 1–4 shipped 2026-04-21 on `feat/onboarding-v1` (verified
+live against real Slack + real Reo). Steps 5–10 + step 10 first-run DM
+tweak remain. See `DECISIONS.md` 2026-04-21 for live-test lessons that
+the remaining steps must honour.
 Owner: pratyush.kukreja@gmail.com
 Supersedes: nothing (new doc)
 
@@ -59,14 +62,14 @@ once with `Fernet.generate_key()`, never rotate without re-encrypting files).
 
 ## Build order
 
-### 1. Config store module
+### 1. Config store module ✅ (shipped)
 - `claw/config.py`: `load_config(team_id)`, `save_config(team_id, config)`,
   `delete_config(team_id)`.
 - Fernet encrypt/decrypt on `reo_api_key` field only.
 - Files written with `os.open(..., 0o600)` to enforce perms.
 - Unit tests with a tmpdir volume.
 
-### 2. `/setup` command + Slack modal
+### 2. `/setup` command + Slack modal ✅ (shipped — two-step, async loader between steps; ACCOUNT-type filter; 100-option cap with default pinned)
 - Slash command `/setup` opens a modal with fields:
   - Reo API key (password input)
   - Tenant ID (plain text)
@@ -81,7 +84,7 @@ once with `Fernet.generate_key()`, never rotate without re-encrypting files).
 - On submit: validate API key against Reo (ping `list_segments`), save config,
   ack modal. If validation fails, re-open modal with inline error.
 
-### 3. Credential validation + error mapping
+### 3. Credential validation + error mapping ✅ (shipped — `claw/errors.py::map_reo_error` + `list_segments_safe`)
 - Wrap every Reo call in a helper that maps:
   - 401/403 → "Invalid API key — double-check it in Reo's dashboard."
   - 404 → "That segment / tenant couldn't be found. Did it get deleted?"
@@ -90,7 +93,7 @@ once with `Fernet.generate_key()`, never rotate without re-encrypting files).
   - timeout → "Reo didn't respond in time. Try again."
 - Never expose tracebacks or raw error bodies to Slack.
 
-### 4. Refactor `/run-digest`
+### 4. Refactor `/run-digest` ✅ (shipped — picks from configured channel, updates default on change, per-workspace Reo key forwarded to MCP subprocess via stdio `env`; auto-join + DM fallback on `not_in_channel`)
 - Load config by `team_id` from `body["team_id"]`.
 - If no config → "Run `/setup` first."
 - Open segment-picker modal pre-filled with `default_segment_id`, live-load

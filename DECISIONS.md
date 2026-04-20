@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-04-21 — Onboarding v1 live-test lessons
+
+Steps 1–4 of `docs/onboarding-plan.md` shipped on `feat/onboarding-v1` and
+were verified end-to-end against real Slack + real Reo. Four findings
+that are not obvious from the spec and that the scheduler/`/config`
+work must honour:
+
+### L1 — Slack `static_select` has a 100-option hard cap
+- Reo returns ~500 segments on this tenant; Slack rejects the `views.update`
+  with `invalid_arguments` if the picker exceeds 100 options.
+- `build_setup_step2_view` / `build_run_digest_view` sort alphabetically,
+  pin the current default to the top, and truncate at 100.
+- When we add `/config`, segment editing must use the same cap. If we
+  ever exceed 100 ACCOUNT segments after the ACCOUNT filter (see L2),
+  switch to an `external_select` with typeahead.
+
+### L2 — `/setup` picker must filter segments to `type == "ACCOUNT"`
+- The digest pipeline (`get_top_intent_accounts` → `/segment/{id}/accounts`)
+  only works on ACCOUNT segments. BUYER and DEVELOPER segments feed
+  different workflows.
+- First live run picked a DEVELOPER segment; the agent couldn't find it
+  in the filtered MCP `list_segments` result and fell back to the
+  AGENTS.md §8 auth-error response ("Reo API key rejected"). Looked like
+  a key bug; wasn't.
+- `claw/errors.py::list_segments_safe` now filters at the host layer.
+
+### L3 — Per-workspace Reo key must flow into the MCP subprocess
+- `claw_mcp/server.py` reads `REO_API_KEY` from `os.environ`. The agent
+  spawns it as a stdio child, so it does NOT see the per-workspace key
+  we just saved to `config.json`.
+- Pass the key via the stdio `env` field of the `mcp_servers` dict
+  (supported by `claude-agent-sdk`'s `McpStdioServerConfig`).
+- Parent `.env` currently has the same key so the bug was invisible
+  until we tested with a bad key. Scheduler must load cfg and forward
+  `cfg["reo_api_key"]` on every run.
+
+### L4 — `chat.postMessage` must handle `not_in_channel`
+- The bot is not auto-added to the configured digest channel after
+  OAuth. Posting silently fails with `not_in_channel`.
+- `slack_app._post_with_autojoin`: catch `not_in_channel` → try
+  `conversations.join` (public channels) → on failure, DM the
+  `installer_user_id` with the digest body + a nudge to `/invite @claw`.
+- Requires the `channels:join` bot scope. Private channels always
+  fall through to the DM path.
+
+### L5 — Slack view_submission 3-second ack budget
+- Step-1 submission requires a synchronous Reo `list_segments` call
+  (~2s on this tenant). Running it inside the view handler blows the
+  3-second budget and shows "We had some trouble connecting."
+- Pattern: `ack(response_action="update", view=loading_view)` fast,
+  then a background thread does the Reo call and `client.views_update`
+  with step 2 or an error banner. Same pattern will apply to every
+  future modal that talks to Reo inside a view handler.
+
+---
+
 ## 2026-04-20 — Pivot: Pinata → self-hosted Agent SDK on Railway
 
 Pinata's support could not unblock the deploy timeline. We pivoted to a

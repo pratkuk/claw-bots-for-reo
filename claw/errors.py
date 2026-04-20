@@ -60,6 +60,12 @@ def validate_api_key(api_key: str) -> None:
 
 
 def list_segments_safe(api_key: str) -> list[dict]:
-    """Return all segments for ``api_key``. Raises Reo*Error on failure."""
+    """Return ACCOUNT-type segments for ``api_key`` (single page).
+
+    The digest pipeline only works on ACCOUNT segments — DEVELOPER and
+    BUYER segments feed different workflows. Filtering here keeps the
+    Slack picker from offering segments the agent can't use. A successful
+    response also proves the key is valid (no separate ping needed).
+    """
     with ReoClient(api_key=api_key) as client:
-        return client.list_all_segments()
+        return [s for s in client.list_segments() if s.get("type") == "ACCOUNT"]

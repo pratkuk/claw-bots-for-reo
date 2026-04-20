@@ -43,7 +43,7 @@ def _load_system_prompt() -> str:
     return "\n\n".join(parts)
 
 
-async def _run(prompt: str) -> str:
+async def _run(prompt: str, reo_api_key: str) -> str:
     from claude_agent_sdk import (
         AssistantMessage,
         ClaudeAgentOptions,
@@ -60,6 +60,7 @@ async def _run(prompt: str) -> str:
                 "command": str(VENV_PYTHON),
                 "args": [str(MCP_DIR / "server.py"), "--transport", "stdio"],
                 "cwd": str(MCP_DIR),
+                "env": {"REO_API_KEY": reo_api_key},
             },
         },
         allowed_tools=[
@@ -92,9 +93,9 @@ async def _run(prompt: str) -> str:
     return "\n".join(parts).strip() or "(agent returned no text)"
 
 
-def run_digest_agent(segment_id: str, today: str) -> str:
+def run_digest_agent(segment_id: str, today: str, reo_api_key: str) -> str:
     """Synchronous entry point — runs the agent in a fresh event loop."""
     prompt = DIGEST_PROMPT_TEMPLATE.format(segment_id=segment_id, today=today)
     claude_cli = shutil.which("claude")
     log.info("run_digest_agent start; claude CLI=%s segment=%s", claude_cli, segment_id)
-    return asyncio.run(_run(prompt))
+    return asyncio.run(_run(prompt, reo_api_key))

@@ -112,13 +112,12 @@ def _run_digest_view(segment_id: str) -> dict:
 def test_setup_step1_bad_key_re_renders_error(
     encryption_key: str, volume_dir: Path
 ) -> None:
-    def bad_validate(_key: str) -> None:
+    def bad_list(_key: str) -> list[dict]:
         raise ReoAuthError("401")
 
     result = h.handle_setup_step1_submit(
         _step1_view("sk_wrong", "tenant-1"),
-        validate_fn=bad_validate,
-        list_segments_fn=lambda _k: SEGMENTS,
+        list_segments_fn=bad_list,
     )
     assert result["callback_id"] == h.SETUP_STEP1_CALLBACK
     # Error banner is a section block above the inputs.
@@ -133,7 +132,6 @@ def test_setup_step1_empty_fields_re_renders_error(
 ) -> None:
     result = h.handle_setup_step1_submit(
         _step1_view("", ""),
-        validate_fn=lambda _k: None,
         list_segments_fn=lambda _k: SEGMENTS,
     )
     assert result["callback_id"] == h.SETUP_STEP1_CALLBACK
@@ -142,7 +140,6 @@ def test_setup_step1_empty_fields_re_renders_error(
 def test_setup_step1_success_pushes_step2(encryption_key: str) -> None:
     result = h.handle_setup_step1_submit(
         _step1_view("sk_good", "tenant-1"),
-        validate_fn=lambda _k: None,
         list_segments_fn=lambda _k: SEGMENTS,
     )
     assert result["callback_id"] == h.SETUP_STEP2_CALLBACK
@@ -154,7 +151,8 @@ def test_setup_step1_success_pushes_step2(encryption_key: str) -> None:
     # Segment dropdown populated.
     seg_block = next(b for b in result["blocks"] if b["block_id"] == h.SEGMENT_BLOCK)
     opt_values = [o["value"] for o in seg_block["element"]["options"]]
-    assert opt_values == ["seg-1", "seg-2"]
+    # Alphabetical by segment name: "Dormant accounts" before "Web3 infra…"
+    assert opt_values == ["seg-2", "seg-1"]
 
 
 # ─── /setup step 2 ───────────────────────────────────────────
@@ -300,7 +298,6 @@ def test_e2e_setup_then_run_digest_uses_configured_channel(
     # Step 1 passes validation.
     step2 = h.handle_setup_step1_submit(
         _step1_view("sk_e2e", "tenant-e2e"),
-        validate_fn=lambda _k: None,
         list_segments_fn=lambda _k: SEGMENTS,
     )
     assert step2["callback_id"] == h.SETUP_STEP2_CALLBACK

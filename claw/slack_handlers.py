@@ -27,7 +27,6 @@ from . import config as config_store
 from .errors import (
     list_segments_safe,
     map_reo_error,
-    validate_api_key,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -56,6 +55,11 @@ LIMIT_ACTION = "limit_input"
 WEB3_BLOCK = "web3_block"
 WEB3_ACTION = "web3_checkbox"
 
+# Slack static_select / multi_static_select caps at 100 options. Workspaces
+# with more segments get truncated for v1; upgrade to external_select with
+# typeahead search if anyone hits this in practice.
+SEGMENT_SELECT_MAX = 100
+
 SCHEDULE_TIME_MANUAL = "manual"
 DEFAULT_TIMEZONES = [
     ("America/Los_Angeles", "Los Angeles"),
@@ -78,6 +82,31 @@ DEFAULT_SCHEDULE_TIMES = [
 # ─────────────────────────────────────────────────────────────
 # Block builders
 # ─────────────────────────────────────────────────────────────
+
+
+def build_setup_loading_view() -> dict[str, Any]:
+    """Intermediate view shown while we wait for Reo's ``list_segments``.
+
+    Slack view submissions have a 3-second ack budget. If the Reo call
+    takes longer, the whole flow 500s with "trouble connecting". Instead
+    we ack with this view immediately, then ``views.update`` to the real
+    step 2 from a background thread once Reo responds.
+    """
+    return {
+        "type": "modal",
+        "callback_id": "claw_setup_loading",
+        "title": {"type": "plain_text", "text": "Claw setup · loading"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": ":hourglass_flowing_sand: Checking your API key against Reo…",
+                },
+            }
+        ],
+    }
 
 
 def build_setup_step1_view(error: str | None = None) -> dict[str, Any]:
@@ -132,12 +161,18 @@ def build_setup_step2_view(
     the submission handler can persist them without re-prompting.
     """
     existing = existing or {}
+    # Prefer the currently-selected segment, then alphabetical, capped at Slack's 100.
+    default_id = existing.get("default_segment_id")
+    sorted_segments = sorted(segments, key=lambda s: s.get("name", "").lower())
+    if default_id:
+        sorted_segments.sort(key=lambda s: s.get("id") != default_id)
+    trimmed = sorted_segments[:SEGMENT_SELECT_MAX]
     segment_options = [
         {
             "text": {"type": "plain_text", "text": s["name"][:75]},
             "value": s["id"],
         }
-        for s in segments
+        for s in trimmed
     ]
     if not segment_options:
         segment_options = [
@@ -275,12 +310,16 @@ def build_setup_step2_view(
 def build_run_digest_view(
     segments: list[dict[str, Any]], default_segment_id: str
 ) -> dict[str, Any]:
+    sorted_segments = sorted(segments, key=lambda s: s.get("name", "").lower())
+    if default_segment_id:
+        sorted_segments.sort(key=lambda s: s.get("id") != default_segment_id)
+    trimmed = sorted_segments[:SEGMENT_SELECT_MAX]
     options = [
         {
             "text": {"type": "plain_text", "text": s["name"][:75]},
             "value": s["id"],
         }
-        for s in segments
+        for s in trimmed
     ] or [
         {"text": {"type": "plain_text", "text": "(no segments)"}, "value": "none"}
     ]
@@ -369,13 +408,13 @@ def read_run_digest_segment(view: dict[str, Any]) -> str:
 def handle_setup_step1_submit(
     view: dict[str, Any],
     *,
-    validate_fn: Callable[[str], None] = validate_api_key,
     list_segments_fn: Callable[[str], list[dict[str, Any]]] = list_segments_safe,
 ) -> dict[str, Any]:
-    """Validate API key, list segments, return either the step-2 view or an error.
+    """List segments → step-2 view, or re-render step 1 with an error.
 
-    Returns a Slack ``views.update``-compatible dict. On error, re-renders
-    step 1 with the error banner; on success, returns the step-2 view.
+    One Reo call — a successful ``list_segments`` proves the key works
+    *and* gives us the dropdown options. Must complete within Slack's
+    3-second view-submission ack budget.
     """
     try:
         api_key, tenant_id = read_step1(view)
@@ -386,7 +425,6 @@ def handle_setup_step1_submit(
         return build_setup_step1_view(error="Please fill in both fields.")
 
     try:
-        validate_fn(api_key)
         segments = list_segments_fn(api_key)
     except Exception as exc:
         return build_setup_step1_view(error=map_reo_error(exc))
