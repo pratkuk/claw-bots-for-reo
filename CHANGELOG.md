@@ -6,22 +6,74 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (2026-04-20) — Pivot from Pinata to self-hosted
+
+- **Architecture:** dropped Pinata / OpenClaw runtime entirely.
+  Replaced with a single self-hosted Python process (Flask +
+  slack-bolt + APScheduler) on Railway, driving the Claude Agent SDK
+  per digest run. The Agent SDK spawns the Claw MCP as a stdio child.
+- **Storage:** per-workspace encrypted `config.json` on a persistent
+  volume (Fernet, perms 0600), keyed by Slack `team_id`. Replaces the
+  single-tenant `workspace/USER.md` model.
+- **Slack:** slack-bolt OAuth install + signed-request verification +
+  `chat.postMessage`. Replaces Pinata's `channels.slack` pairing.
+- **MCP transport:** stdio child of the Agent SDK. Replaces HTTP on
+  port 8787 via Pinata's `routes`.
+- **MCP rename:** `workspace/projects/reo_mcp/` → `claw_mcp/`. Tool
+  namespace `mcp__reo__*` → `mcp__claw__*`. FastMCP server name
+  `reo-mcp` → `claw-mcp`. The name "Reo MCP" inside the company
+  refers to Reo's official internal MCP; our server is "Claw MCP".
+- **Deleted files:** `manifest.json`, `workspace/BOOTSTRAP.md`,
+  `workspace/USER.md` (all Pinata/OpenClaw runtime contracts).
+- **Rewritten context docs:** `README.md`, `workspace/TOOLS.md`,
+  `workspace/AGENTS.md`, `workspace/HEARTBEAT.md`, `DECISIONS.md`.
+- **New docs:** `docs/onboarding-plan.md` — locked spec for the
+  multi-tenant `/setup` + `/config` modal flow, config schema,
+  build order, and v1 / v1.1 scope.
+
+### Proven (2026-04-20) — via local spikes
+
+- `scripts/spike_agent_sdk.py` — V2 PASS: Claude Agent SDK spawns
+  Claw MCP as stdio child, tool call fires, tool result round-trips.
+- `scripts/spike_slack_volume_cron.py` — D1 + D2 + D4 PASS: signed
+  Slack request handling, volume-persistent state across process
+  restart, one entrypoint serving both Slack and cron triggers.
+- `scripts/spike_slack_live.py` — end-to-end live: Slack OAuth
+  install into a real workspace + `/run-digest` → real Reo API pulls
+  + real drafted digest posted back to #reo-intel-test.
+
+### Planned for v1.0 ship (in progress)
+
+See `docs/onboarding-plan.md` for the full 10-step build order.
+Summary: per-workspace config store → `/setup` modal → credential
+validation → refactor `/run-digest` → APScheduler cron →
+`/config` / `/pause` / `/resume` → uninstall handler → welcome DM →
+first-run test digest.
+
 ### Planned for v1.1
-- Extract `reo_mcp` into a standalone ClawHub skill for reuse in
-  other templates.
+
+- Per-user configs within a workspace.
+- Multi-segment scheduling (one workspace, multiple crons, different
+  segments each).
+- Pinned-segment override to prevent `default_segment_id` drift on
+  manual runs.
+- Outreach style / POV preferences (spice level, economic-buyer rules).
+- Hosted web setup page (needed if Reo ever adds OAuth).
+- Secrets-manager-backed storage (needed for hosted multi-tenant).
 - `get_hiring_signals` tool (needs Reo per-account jobs endpoint).
 - Weekly signal-quality retrospective as Task 2 in HEARTBEAT.md.
-- Telegram channel support (Web3 GTM teams are Telegram-heavy).
+- Telegram channel support.
 - Native Web3 tagging if Reo adds a first-class field (retire the
   297-domain allow-list).
 
 ## [1.0.0-rc1] — 2026-04-16
 
-First release candidate. Functionally complete, pending live deploy
-against Pinata's marketplace runtime.
+First release candidate. Functionally complete, originally targeted
+at Pinata's marketplace runtime — that target was abandoned on
+2026-04-20 (see Unreleased section above).
 
 ### Added
-- `workspace/projects/reo_mcp/` — FastMCP server with 5 typed tools
+- `workspace/projects/claw_mcp/` — FastMCP server with 5 typed tools
   (`list_segments`, `get_top_intent_accounts`,
   `get_account_activity_detail`, `get_active_developers`,
   `get_key_contacts`).
@@ -36,9 +88,11 @@ against Pinata's marketplace runtime.
   the real Reo API and writes a sanitised fixture to `docs/samples/`.
 - Web3 allow-list seeded from 297 real domains in the Reo crypto
   segment. Runtime extension via `/web3-domains +foo.xyz`.
-- OpenClaw workspace contracts: `IDENTITY.md`, `SOUL.md`,
-  `AGENTS.md`, `BOOTSTRAP.md`, `HEARTBEAT.md`, `TOOLS.md`, `USER.md`.
-- `manifest.json` — binds the agent runtime: Slack pairing, daily cron
+- Workspace agent contracts: `IDENTITY.md`, `SOUL.md`, `AGENTS.md`,
+  `HEARTBEAT.md`, `TOOLS.md`. (`BOOTSTRAP.md` and `USER.md` were
+  deleted in the 2026-04-20 pivot.)
+- `manifest.json` (deleted 2026-04-20) — originally bound the agent
+  runtime to Pinata's marketplace: Slack pairing, daily cron
   `0 14 * * *`, MCP server on port 8787 at `/mcp`.
 - User-facing `README.md` and this `CHANGELOG.md`.
 - MIT license, `.env.example`, ruff config, pinned dependencies.

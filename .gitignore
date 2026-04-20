@@ -43,8 +43,10 @@ Thumbs.db
 *.swo
 *~
 
-# ─── Pinata / OpenClaw runtime state ──────────────────────
-# USER.md is filled in at runtime by the agent as it learns about the user.
-# We ship it blank in the template; if it's edited locally, do not commit.
-# (Remove the next line if you want to intentionally ship learned USER.md content.)
-# workspace/USER.md
+# ─── Runtime state (never commit — holds tokens + PII) ────
+workspace/.slack_installations/
+workspace/.slack_oauth_state/
+workspace/.claw_configs/
+workspace/spike_live.log
+workspace/spike_live.stdout.log
+workspace/last-failed-digest.md

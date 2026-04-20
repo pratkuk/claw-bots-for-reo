@@ -12,7 +12,7 @@ with a `confidence: "low"` tag (Option 3 from the design conversation).
 
 from __future__ import annotations
 
-from reo_mcp.tools.activity import (
+from claw_mcp.tools.activity import (
     _confidence,
     _rank_key,
     _slim_account,

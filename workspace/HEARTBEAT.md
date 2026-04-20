@@ -1,34 +1,37 @@
 # Heartbeat — scheduled tasks
 
-> The `tasks` array in `manifest.json` references these by name. If a
+> The host process's scheduler (APScheduler, one job per configured
+> workspace) invokes the tasks below at their configured times. If a
 > task isn't listed here, it doesn't run.
 
 ## Task 1 — Daily intent digest
 
 **Name:** `daily-intent-digest`
-**Schedule:** `0 14 * * *` (14:00 UTC every day; override via `/adjust schedule`)
-**Enabled by default:** yes
+**Schedule:** per-workspace, from `config.schedule` (cron + tz). If
+the workspace's schedule is null, the task runs manual-only.
+**Enabled by default:** no — the host creates the scheduled job only
+after the user completes `/setup` with a schedule selected.
 
 ### Preconditions
 
-- `workspace/BOOTSTRAP.md` does **not** exist (bootstrap complete).
-- `USER.md` has `default_segment_id` and `slack_channel` set.
-- MCP server reachable at `/mcp` (AGENTS.md §8 covers failure modes).
+- The host loaded a complete per-workspace config (AGENTS.md §1).
+- `config.paused` is false (AGENTS.md §7 `/pause` / `/resume`).
+- Claw MCP server can be spawned as a stdio child.
 
-If any precondition fails, abort silently — do not post an error every
-day to the user's Slack. Post only on the first failure, then stay quiet
-until fixed.
+If any precondition fails, abort silently — do not post an error
+every day to the user's Slack. Post only on the first failure, then
+stay quiet until fixed.
 
 ### Prompt
 
-You are running the daily intent digest. Read `USER.md` for
-configuration, then:
+You are running the daily intent digest. Use the per-workspace config
+that was passed to you, then:
 
 1. Call `get_top_intent_accounts` with:
-   - `segment_id = USER.md:default_segment_id`
-   - `limit = USER.md:digest_limit` (default 10)
-   - `web3_only = USER.md:web3_only` (default true)
-   - `extra_web3_domains = USER.md:web3_domains_extensions` (if any)
+   - `segment_id = config.default_segment_id`
+   - `limit = config.digest_limit` (default 10 if unset)
+   - `web3_only = config.web3_only` (default true)
+   - `extra_web3_domains = config.web3_domains_extensions` (if any)
 
 2. Take the top 5 accounts by rank (the list is pre-sorted). For each,
    in parallel:
@@ -54,11 +57,11 @@ configuration, then:
    - Header: date, scanned count, filtered count, `web3_only` state.
    - 5 account sections, high-confidence first, then medium under
      "Worth a look". See `docs/sample-digest.md` for shape.
-   - Footer: command hints (`/run-digest`, `/adjust`, `/explain`).
+   - Footer: command hints (`/run-digest`, `/config`, `/explain`).
 
-5. Post once to `USER.md:slack_channel`. If the post fails, retry once
-   after 30s. If it still fails, write the digest body to
-   `workspace/last-failed-digest.md` and move on.
+5. Return the post body to the host, which posts it to
+   `config.digest_channel_id`. If the host's post fails, it retries
+   once after 30s; on second failure it logs and moves on.
 
 ### Output contract
 
@@ -74,10 +77,10 @@ configuration, then:
 
 | Condition | Action |
 | --- | --- |
-| MCP server returns 5xx after retries | Post once (per AGENTS.md §8), skip digest for today |
-| Reo auth error | Post once, disable this task until user re-pairs |
+| Claw MCP spawn fails | Host posts once (per AGENTS.md §8), skips digest for today |
+| Reo auth error | Host posts once, marks workspace as needing re-config |
 | All accounts return `confidence: "low"` | Post the "nothing urgent" message from AGENTS.md §3 |
-| Slack post fails twice | Write to `last-failed-digest.md`, continue silently |
+| Slack post fails twice | Host logs the body and continues silently |
 
 ## Task 2 — (reserved, v1.1)
 

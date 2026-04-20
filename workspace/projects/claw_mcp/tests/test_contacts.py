@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from reo_mcp.tools.contacts import _matches, _normalise, get_key_contacts
+from claw_mcp.tools.contacts import _matches, _normalise, get_key_contacts
 
 # ─────────────────────────────────────────────────────────────
 # Pure helpers

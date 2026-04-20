@@ -1,4 +1,4 @@
-"""Reo MCP — local FastMCP server wrapping the Reo REST API.
+"""Claw MCP — local FastMCP server wrapping the Reo REST API.
 
 Exposes 5 tools to the OpenClaw agent:
   - list_segments

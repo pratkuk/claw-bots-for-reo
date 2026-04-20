@@ -37,17 +37,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ENV_PATH = REPO_ROOT / ".env"
 SAMPLES_DIR = REPO_ROOT / "docs" / "samples"
 
-# Ensure the reo_mcp package is importable.
+# Ensure the claw_mcp package is importable.
 sys.path.insert(0, str(REPO_ROOT / "workspace" / "projects"))
 
-from reo_mcp.reo_client import ReoClient  # noqa: E402
-from reo_mcp.tools.activity import (  # noqa: E402
+from claw_mcp.reo_client import ReoClient  # noqa: E402
+from claw_mcp.tools.activity import (  # noqa: E402
     get_account_activity_detail,
     get_active_developers,
     get_top_intent_accounts,
     list_segments,
 )
-from reo_mcp.tools.contacts import get_key_contacts  # noqa: E402
+from claw_mcp.tools.contacts import get_key_contacts  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────

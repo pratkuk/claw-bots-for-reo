@@ -184,7 +184,7 @@ File: [`docs/samples/web3_allowlist_seed.txt`](samples/web3_allowlist_seed.txt) 
 
 Sample entries: `a16z.com`, `circle.com`, `blockchain.com`, `chainalysis.com`, `stellar.org`, `ockam.io`, `crusoeenergy.com`, `merklescience.com`, `falconx.io`.
 
-In the MCP server this ships as `workspace/projects/reo-mcp/web3_domains.py` with a frozenset for O(1) lookups. Users can extend via `/web3-domains +foo.xyz` at runtime.
+In the MCP server this ships as `workspace/projects/claw_mcp/web3_domains.py` with a frozenset for O(1) lookups. Users can extend via `/web3-domains +foo.xyz` at runtime.
 
 ## Segment ID bootstrap flow
 

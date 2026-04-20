@@ -17,7 +17,7 @@ import httpx
 import pytest
 import respx
 
-from reo_mcp.reo_client import (
+from claw_mcp.reo_client import (
     ReoAuthError,
     ReoClient,
     ReoClientError,
@@ -37,7 +37,7 @@ def client() -> ReoClient:
 @pytest.fixture(autouse=True)
 def no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     """Neutralise time.sleep so retry tests run in milliseconds."""
-    monkeypatch.setattr("reo_mcp.reo_client.time.sleep", lambda _: None)
+    monkeypatch.setattr("claw_mcp.reo_client.time.sleep", lambda _: None)
 
 
 # ─────────────────────────────────────────────────────────────

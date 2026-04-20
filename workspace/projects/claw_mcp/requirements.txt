@@ -1,4 +1,4 @@
-# Reo MCP server — pinned production dependencies.
+# Claw MCP server — pinned production dependencies.
 # Pin exact versions per §1.1 of reo_pinata_agent_context.md.
 
 fastmcp==3.2.4

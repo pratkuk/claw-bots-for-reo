@@ -24,26 +24,26 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 
-# Allow running as a script: `python3 server.py` from inside reo-mcp/.
+# Allow running as a script: `python3 server.py` from inside claw-mcp/.
 _HERE = Path(__file__).resolve().parent
 if str(_HERE.parent) not in sys.path:
     sys.path.insert(0, str(_HERE.parent))
 
 # ruff: noqa: E402 — imports after sys.path manipulation, intentional.
-from reo_mcp.reo_client import ReoClient  # type: ignore[import-not-found]
-from reo_mcp.tools.activity import (  # type: ignore[import-not-found]
+from claw_mcp.reo_client import ReoClient  # type: ignore[import-not-found]
+from claw_mcp.tools.activity import (  # type: ignore[import-not-found]
     get_account_activity_detail as _get_account_activity_detail,
 )
-from reo_mcp.tools.activity import (  # type: ignore[import-not-found]
+from claw_mcp.tools.activity import (  # type: ignore[import-not-found]
     get_active_developers as _get_active_developers,
 )
-from reo_mcp.tools.activity import (  # type: ignore[import-not-found]
+from claw_mcp.tools.activity import (  # type: ignore[import-not-found]
     get_top_intent_accounts as _get_top_intent_accounts,
 )
-from reo_mcp.tools.activity import (  # type: ignore[import-not-found]
+from claw_mcp.tools.activity import (  # type: ignore[import-not-found]
     list_segments as _list_segments,
 )
-from reo_mcp.tools.contacts import (  # type: ignore[import-not-found]
+from claw_mcp.tools.contacts import (  # type: ignore[import-not-found]
     get_key_contacts as _get_key_contacts,
 )
 
@@ -90,7 +90,7 @@ def _get_client() -> ReoClient:
 # ─────────────────────────────────────────────────────────────
 
 mcp: FastMCP = FastMCP(
-    name="reo-mcp",
+    name="claw-mcp",
     instructions=(
         "Tools for Reo.Dev revenue intelligence. Use list_segments to discover "
         "available segments, then get_top_intent_accounts to rank accounts "
@@ -225,7 +225,7 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
     )
 
-    parser = argparse.ArgumentParser(description="Reo MCP server")
+    parser = argparse.ArgumentParser(description="Claw MCP server")
     parser.add_argument(
         "--host",
         default="127.0.0.1",
@@ -251,7 +251,7 @@ def main() -> int:
     if args.transport == "stdio":
         mcp.run(transport="stdio")
     else:
-        logger.info("starting Reo MCP server on %s:%d%s", args.host, args.port, args.path)
+        logger.info("starting Claw MCP server on %s:%d%s", args.host, args.port, args.path)
         mcp.run(
             transport="http",
             host=args.host,

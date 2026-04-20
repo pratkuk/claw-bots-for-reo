@@ -1,94 +1,85 @@
 # Claw Bots for Reo
 
-> A 1-click deployable OpenClaw agent template that surfaces the Web3
-> developers showing buying intent for your tool — with drafted outreach
-> messages — in your Slack every morning.
+> A self-hosted Slack app that surfaces the Web3 developers showing
+> buying intent for your tool — with drafted outreach messages — in
+> your Slack every morning. Built on the Claude Agent SDK.
 
-**Status:** v1.0.0-rc1 (release candidate). See
-[DECISIONS.md](DECISIONS.md) for what's locked in.
+**Status:** multi-tenant onboarding in progress. The single-tenant
+spike (`scripts/spike_slack_live.py`) is live end-to-end; the next
+build is the real multi-workspace service defined in
+[docs/onboarding-plan.md](docs/onboarding-plan.md).
 
 ---
 
-## What this template does
+## What this app does
 
-Every morning, the agent:
+Every morning, for each installed Slack workspace:
 
-1. Scans the accounts in a Reo segment you pre-created (your Web3 target list).
+1. Scans accounts in the Reo segment that workspace configured (their
+   Web3 target list).
 2. Ranks them: `developer_activity` tier (HIGH > MEDIUM > LOW > empty),
    tie-broken by `active_developers_count` descending.
-3. Applies a Web3 allow-list of 297 seed domains (extendable at runtime).
+3. Applies a Web3 allow-list of 297 seed domains (extendable per
+   workspace).
 4. For the top 5 accounts, pulls activity detail + most-active contacts.
 5. Drafts a personalised first-touch message referencing the exact signals.
-6. Posts a prioritised digest to a Slack channel you pair during bootstrap.
+6. Posts a prioritised digest to the Slack channel that workspace picked
+   during `/setup`.
 
-Runs autonomously. Configurable via slash commands (`/run-digest`,
-`/adjust schedule`, `/explain <domain>`, `/segment <url>`).
+Runs autonomously on a per-workspace schedule. Configurable via Slack
+slash commands (`/setup`, `/config`, `/run-digest`, `/pause`, `/resume`).
 
 ## Who it's for
 
 **Web3 devtool GTM teams** — infra, SDKs, indexers, wallets, chain
 companies — using [Reo.Dev](https://reo.dev) for revenue intelligence.
 
-It's also useful for Web2 teams with a Reo account: toggle
-`/adjust web3_only=false` and it ranks your full segment.
+Also useful for Web2 teams with a Reo account: toggle `web3_only=false`
+in `/config` and it ranks your full segment.
 
-## What you'll need before deploying
+## Architecture (short version)
 
-- A **Reo.Dev** account + API key ([contact@reo.dev](mailto:contact@reo.dev)
-  or see [developers.reo.dev](https://developers.reo.dev)).
-- An **ACCOUNT-type segment** pre-created in the Reo dashboard
-  (`https://web.reo.dev/dashboard/segments`) — the agent ranks accounts
-  _within_ a segment. It doesn't crawl Reo's full universe.
-- A **Slack workspace** where the agent can post.
-- A **Pinata agents account** at [agents.pinata.cloud](https://agents.pinata.cloud).
+- **Host:** single Python process running Flask + slack-bolt + APScheduler.
+- **Agent loop:** Claude Agent SDK (`claude-agent-sdk`) spawned per
+  digest run; it drives the prompt workflow in `workspace/HEARTBEAT.md`.
+- **Tools:** a local FastMCP server (Claw MCP) at
+  `workspace/projects/claw_mcp/` launched as a **stdio child** of the
+  Agent SDK; it wraps Reo's REST API behind 5 typed tools.
+- **Per-workspace state:** one encrypted `config.json` per `team_id`
+  on a persistent volume (Railway volume or equivalent).
+- **Slack:** OAuth install + slash commands; bot tokens stored by the
+  host's `FileInstallationStore`.
 
-## Deploy (1-click)
+See [docs/onboarding-plan.md](docs/onboarding-plan.md) for the in-flight
+multi-tenant build and [DECISIONS.md](DECISIONS.md) for the locked
+architectural calls.
 
-1. Click **Deploy** on the [Pinata marketplace listing](https://agents.pinata.cloud)
-   _(link live post-launch)_.
-2. Enter secrets: `REO_API_KEY`, `REO_MCP_INTERNAL_TOKEN` (generate any
-   32+ char random string).
-3. The agent's bootstrap DMs you in Slack — paste your segment URL
-   when prompted (it extracts the UUID).
-4. Pair your Slack channel (Pinata walks you through it).
-5. Run `/run-digest` to test immediately, or wait for the first
-   scheduled run at 14:00 UTC.
+## Install flow (target, once v1 ships)
 
-Full first-run flow is documented in
-[workspace/BOOTSTRAP.md](workspace/BOOTSTRAP.md).
+1. Click the install link for your Slack workspace (OAuth).
+2. Installer gets a welcome DM: "Run `/setup` to get started."
+3. `/setup` opens a Slack modal — paste Reo API key, pick tenant,
+   pick segment from a live dropdown, pick channel, pick schedule.
+4. The host validates the key, saves config, runs a test digest to the
+   installer's DM so they see the shape.
+5. Daily scheduled digests start posting to the chosen channel.
 
 ## Configuration (slash commands)
 
 | Command | Effect |
 | --- | --- |
-| `/run-digest` | Run the digest right now |
-| `/adjust web3_only=false` | Broaden to all accounts in the segment |
-| `/adjust limit=10` | Change how many accounts appear in the digest |
-| `/adjust schedule "0 14 * * 1-5"` | Change the cron (e.g. weekday mornings) |
-| `/web3-domains +foo.xyz` | Add a domain to the Web3 allow-list at runtime |
-| `/web3-domains -foo.xyz` | Remove a user-added domain |
+| `/setup` | First-time config (modal) |
+| `/config` | Edit existing config (same modal, pre-filled) |
+| `/run-digest` | Run the digest right now (segment picker pre-fills to default) |
+| `/pause` | Pause scheduled digests |
+| `/resume` | Re-enable scheduled digests |
 | `/explain <domain>` | Full signal breakdown for one account |
 | `/contacts <domain> [function=X] [seniority=Y]` | Just the contacts |
-| `/segment <url-or-uuid>` | Change which segment the agent monitors |
-
-Preferences persist in [workspace/USER.md](workspace/USER.md). Rule set
-lives in [workspace/AGENTS.md](workspace/AGENTS.md).
 
 ## Example output
 
 See [docs/sample-digest.md](docs/sample-digest.md) for the target Slack
 output shape.
-
-## Troubleshooting
-
-| Symptom | Fix |
-| --- | --- |
-| Digest is empty | Check your segment has accounts and they have recent activity — `/explain <domain>` reveals raw signals |
-| Slack messages not arriving | Re-run Slack pairing during bootstrap |
-| Agent says "segment not visible" | The segment URL/UUID is wrong or the API key can't see it — open the Reo dashboard, copy the URL after `?segId=` |
-| `Reo API key rejected` | Rotate the key in Reo Settings → API, update the `REO_API_KEY` secret in the agent's secret store |
-| Rate-limited (429) | The MCP server auto-retries with backoff; if persistent, reduce `digest_limit` |
-| "MCP server down — will retry tomorrow" | Check `scripts.start` logs in the Pinata agent console |
 
 ## Development
 
@@ -96,54 +87,61 @@ output shape.
 git clone https://github.com/pratkuk/claw-bots-for-reo.git
 cd claw-bots-for-reo
 
-# Create venv + install deps
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r workspace/projects/reo_mcp/requirements.txt
+pip install -r workspace/projects/claw_mcp/requirements.txt
+pip install claude-agent-sdk slack-bolt flask python-dotenv
 
-# Fill in REO_API_KEY and REO_TEST_SEGMENT_ID
 cp .env.example .env
-$EDITOR .env
+$EDITOR .env   # fill in REO_API_KEY, Slack app creds, REO_TEST_SEGMENT_ID
 
-# Unit tests (49 passing)
-python -m pytest workspace/projects/reo_mcp/tests -v
+# Unit tests for the Claw MCP (49 passing)
+python -m pytest workspace/projects/claw_mcp/tests -v
 
 # Lint + format
-python -m ruff check workspace/projects/reo_mcp/
-python -m ruff format workspace/projects/reo_mcp/
-
-# Smoke test against live Reo API (auth probe only)
-python scripts/smoke_test.py
+python -m ruff check workspace/projects/claw_mcp/
+python -m ruff format workspace/projects/claw_mcp/
 
 # End-to-end integration against your segment + write sanitised fixture
 python scripts/live_integration.py
+
+# Full single-tenant spike (Slack OAuth install + /run-digest → real digest)
+# Requires an ngrok tunnel for the Slack webhook.
+python scripts/spike_slack_live.py
 ```
 
-See [docs/api-exploration.md](docs/api-exploration.md) for the
-endpoint surface and response shapes, and [DECISIONS.md](DECISIONS.md)
-for ranking, filter, and architecture calls.
+See [docs/api-exploration.md](docs/api-exploration.md) for the Reo
+endpoint surface and response shapes.
 
-## Architecture
+## Architecture (files)
 
-- `manifest.json` — Pinata / OpenClaw agent config.
-- `workspace/*.md` — agent identity, voice, operating rules, scheduled tasks.
-- `workspace/projects/reo_mcp/` — local FastMCP server that wraps Reo's
+- `scripts/spike_slack_live.py` — current single-tenant spike (end-to-end
+  proof; being refactored into the multi-tenant service per
+  `docs/onboarding-plan.md`).
+- `workspace/*.md` — agent identity, voice, operating rules, scheduled
+  tasks. Loaded as the Agent SDK system prompt.
+- `workspace/projects/claw_mcp/` — local FastMCP server wrapping Reo's
   REST API behind 5 typed tools:
-  - `list_segments` (bootstrap)
-  - `get_top_intent_accounts` (entry point for the daily digest)
+  - `list_segments`
+  - `get_top_intent_accounts`
   - `get_account_activity_detail`
   - `get_active_developers`
-  - `get_key_contacts` (function + seniority filter)
+  - `get_key_contacts`
 
-The MCP server runs inside the Pinata container (via `scripts.start`)
-and is exposed on port 8787 at path `/mcp`. The agent calls it over
-HTTP with a shared-secret header (`x-internal-token`).
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Digest is empty | Check your segment has accounts with recent activity — `/explain <domain>` reveals raw signals |
+| Slack messages not arriving | Confirm the bot was added to the configured channel |
+| "segment not visible" | The segment UUID is wrong or the API key can't see it — run `/config` and pick again |
+| `Reo API key rejected` | Rotate the key in Reo Settings → API, update it via `/config` |
+| Rate-limited (429) | The MCP server auto-retries with backoff; if persistent, lower `digest_limit` in `/config` |
 
 ## Support
 
 - Reo: [contact@reo.dev](mailto:contact@reo.dev)
-- Pinata: [agents.pinata.cloud](https://agents.pinata.cloud)
-- Issues with this template: [GitHub Issues](https://github.com/pratkuk/claw-bots-for-reo/issues)
+- Issues with this project: [GitHub Issues](https://github.com/pratkuk/claw-bots-for-reo/issues)
 
 ## License
 

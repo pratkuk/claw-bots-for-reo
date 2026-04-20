@@ -1,10 +1,10 @@
 # MCP server — to be built in Step 2
 
-The Reo MCP server (FastMCP + Python) will live here. See DECISIONS.md for the
+The Claw MCP server (FastMCP + Python) will live here. See DECISIONS.md for the
 5-tool list and ranking rules.
 
 Structure (to be created in Step 2):
-  reo-mcp/
+  claw_mcp/
     server.py           # FastMCP entry point, auth middleware
     reo_client.py       # HTTP client for integration.reo.dev
     web3_domains.py     # allow-list frozenset (seeded from docs/samples/web3_allowlist_seed.txt)

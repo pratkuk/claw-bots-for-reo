@@ -9,7 +9,7 @@ Focus areas:
 
 from __future__ import annotations
 
-from reo_mcp.web3_domains import SEED_WEB3_DOMAINS, is_web3_domain
+from claw_mcp.web3_domains import SEED_WEB3_DOMAINS, is_web3_domain
 
 
 def test_seed_loaded_non_empty() -> None:
