@@ -37,6 +37,24 @@ companies — using [Reo.Dev](https://reo.dev) for revenue intelligence.
 Also useful for Web2 teams with a Reo account: toggle `web3_only=false`
 in `/config` and it ranks your full segment.
 
+## Optional X/Twitter Signal Lane
+
+Reo stays the source of truth for account intent and contacts. If your
+GTM motion also needs public X/Twitter evidence before the Slack digest
+drafts outreach, install [TweetClaw](https://github.com/Xquik-dev/tweetclaw)
+as a separate OpenClaw plugin:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+Use TweetClaw to search tweets, search tweet replies, run user lookup,
+export followers, monitor tweets, receive webhooks, inspect media, and
+draft approval-gated post tweets or post tweet replies around the same
+accounts that Reo ranks. Keep those findings as cited public context in
+the digest, and keep outbound messages reviewed by a human before they
+leave Slack.
+
 ## Architecture (short version)
 
 - **Host:** single Python process running Flask + slack-bolt + APScheduler.
